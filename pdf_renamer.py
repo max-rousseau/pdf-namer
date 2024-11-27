@@ -45,11 +45,16 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     else:
         date_formatted = "UnknownDate"
 
+    # Calculate the maximum length for the summarized name
+    max_total_length = 32  # Total maximum length including date, spaces, and extension
+    fixed_part = f"{date_formatted} - "
+    extension = ".pdf"
+    max_summarized_length = max_total_length - len(fixed_part) - len(extension)
+
     # Prepare the prompt for the Ollama service
     prompt = (
-        "In 30 characters or less, create a summarized file name for the PDF contents supplied. "
-        "The file name should start with the date in this format YYYY.MM.DD then space, then dash, "
-        "then space again and then the name of the file - for example: 2024.10.11 - Mills Peninsula Water Invoice.PDF."
+        f"In {max_summarized_length} characters or less, create a concise name for the PDF contents. "
+        "Do not include any dates or file extensions in the name."
     )
 
     # Send the request to the Ollama service
@@ -67,10 +72,22 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     if "response" not in data:
         raise ValueError("The API response does not contain the 'response' key.")
 
-    # Construct the new filename
+    # Clean and validate the summarized name
     summarized_name = data["response"].strip()
-    new_filename = f"{date_formatted} - {summarized_name}.pdf"
+    # Remove any file extension that might have been added by the LLM
+    summarized_name = os.path.splitext(summarized_name)[0].strip()
+    # Remove invalid filename characters
+    invalid_chars = r'<>:"/\\|?*'
+    summarized_name = re.sub(f'[{invalid_chars}]', '', summarized_name)
+    # Trim the summarized name if it exceeds the maximum length
+    if len(summarized_name) > max_summarized_length:
+        summarized_name = summarized_name[:max_summarized_length].rstrip()
+    # Ensure the summarized name is not empty
+    if not summarized_name:
+        summarized_name = "Untitled"
 
+    # Construct the new filename
+    new_filename = f"{date_formatted} - {summarized_name}.pdf"
     return new_filename
 
 

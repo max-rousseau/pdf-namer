@@ -56,7 +56,7 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     response = requests.post(
         "http://127.0.0.1:11434/api/generate",
         json={
-            "model": "llama3.1:70b-instruct-fp16",
+            "model": "llama3.1:70b-instruct-q8_0",
             "prompt": f"{prompt}\n\n{text}",
             "stream": False,
         },

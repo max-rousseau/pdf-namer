@@ -1,6 +1,7 @@
 import click
 import re
 import json
+import time
 from pathlib import Path
 import requests
 from tqdm import tqdm
@@ -47,7 +48,11 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     prompt = prompt_path.read_text()
     prompt = prompt.format(text=text)
 
-    # Send the request to the Ollama service
+    # Print prompt length
+    print(f"Sending prompt to Ollama (length: {len(prompt)} characters)")
+
+    # Send the request to the Ollama service and measure time
+    start_time = time.time()
     response = requests.post(
         "http://127.0.0.1:11434/api/generate",
         json={
@@ -60,6 +65,8 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
         timeout=600,
     )
     response.raise_for_status()
+    elapsed_time = time.time() - start_time
+    print(f"Received response from Ollama in {elapsed_time:.2f} seconds")
     try:
         data = response.json()
         if "response" not in data:

@@ -24,6 +24,7 @@ def extract_pdf_text(pdf_path: Path) -> str:
             text += page.extract_text() or ""
     return text
 
+
 def generate_new_filename(text: str, original_file: Path) -> str:
     """
     Generates a new filename based on PDF content and date extracted from the original filename.
@@ -38,7 +39,9 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     # Extract date components from the original filename
     date_match = re.search(r"(\d{4})_(\d{2})_(\d{2})", original_file.name)
     if date_match:
-        date_formatted = f"{date_match.group(1)}.{date_match.group(2)}.{date_match.group(3)}"
+        date_formatted = (
+            f"{date_match.group(1)}.{date_match.group(2)}.{date_match.group(3)}"
+        )
     else:
         date_formatted = "UnknownDate"
 
@@ -53,22 +56,23 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     response = requests.post(
         "http://127.0.0.1:11434/api/generate",
         json={
-            "model": "llama2",
+            "model": "llama3.1:70b-instruct-fp16",
             "prompt": f"{prompt}\n\n{text}",
-            "stream": False
+            "stream": False,
         },
-        timeout=30
+        timeout=30,
     )
     response.raise_for_status()
     data = response.json()
     if "response" not in data:
         raise ValueError("The API response does not contain the 'response' key.")
-    
+
     # Construct the new filename
     summarized_name = data["response"].strip()
     new_filename = f"{date_formatted} - {summarized_name}.pdf"
 
     return new_filename
+
 
 def process_pdfs(directory: Path, test_mode: bool):
     """
@@ -82,10 +86,11 @@ def process_pdfs(directory: Path, test_mode: bool):
 
     # Find all PDF files matching the date pattern
     pdf_files = [
-        file for file in directory.iterdir()
-        if file.is_file() and
-        file.suffix.lower() == ".pdf" and
-        date_pattern.search(file.name)
+        file
+        for file in directory.iterdir()
+        if file.is_file()
+        and file.suffix.lower() == ".pdf"
+        and date_pattern.search(file.name)
     ]
 
     # Process each PDF file with a progress bar
@@ -103,12 +108,16 @@ def process_pdfs(directory: Path, test_mode: bool):
         except Exception as e:
             print(f"Error processing {pdf_file.name}: {e}")
 
+
 @click.command()
-@click.argument('scan_directory', type=click.Path(exists=True, file_okay=False))
-@click.option('--test-mode', is_flag=True, help='Run in test mode without renaming files.')
+@click.argument("scan_directory", type=click.Path(exists=True, file_okay=False))
+@click.option(
+    "--test-mode", is_flag=True, help="Run in test mode without renaming files."
+)
 def main(scan_directory, test_mode):
     """Process PDF files in the provided directory."""
     process_pdfs(Path(scan_directory), test_mode)
+
 
 if __name__ == "__main__":
     main()

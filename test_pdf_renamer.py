@@ -129,6 +129,16 @@ class TestProcessPdfs:
             assert not pdf_file.exists()
             assert (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
 
+    def test_skip_large_content(self, tmp_path):
+        # Create a PDF file with large content
+        pdf_file = tmp_path / "2023_10_12_13_14_15_sample.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4")
+        
+        with patch('pdf_renamer.extract_pdf_text') as mock_extract:
+            mock_extract.return_value = "x" * 10001  # Create text longer than 10000 chars
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+            assert pdf_file.exists()  # File should not be processed due to length
+
     def test_skip_non_matching_files(self, tmp_path):
         # Create a PDF file without date pattern
         pdf_file = tmp_path / "regular.pdf"

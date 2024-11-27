@@ -136,6 +136,10 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
         print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
+            if len(text) > 10000:
+                print(style("Skipping: PDF content exceeds 10,000 characters", fg="yellow"))
+                print(f"Content length: {len(text)} characters")
+                continue
             new_filename = generate_new_filename(text, pdf_file, model)
             if not new_filename:
                 print(f"Error processing {pdf_file.name}. Ignoring.")

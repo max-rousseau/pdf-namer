@@ -1,21 +1,12 @@
 import pytest
 import sys
 from unittest.mock import MagicMock, patch
+from click.testing import CliRunner
 from pathlib import Path
 import requests
 import pypdf
 import pdf_renamer
 
-class TestParseArguments:
-    def test_valid_directory(self, monkeypatch):
-        monkeypatch.setattr(sys, 'argv', ['pdf_renamer.py', 'test_directory'])
-        args = pdf_renamer.parse_arguments()
-        assert args.scan_directory == "test_directory"
-
-    def test_missing_directory(self, monkeypatch):
-        monkeypatch.setattr(sys, 'argv', ['pdf_renamer.py'])
-        with pytest.raises(SystemExit):
-            pdf_renamer.parse_arguments()
 
 class TestExtractPdfText:
     def test_valid_pdf(self):
@@ -80,8 +71,30 @@ class TestGenerateNewFilename:
                 pdf_renamer.generate_new_filename(sample_text, original_file)
 
 class TestProcessPdfs:
+    def test_process_pdfs_test_mode(self, tmp_path):
+        pdf_file = tmp_path / "2023_10_12_13_14_15_sample.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4")
+
+        with patch('pdf_renamer.extract_pdf_text') as mock_extract, \
+             patch('pdf_renamer.generate_new_filename') as mock_generate:
+            mock_extract.return_value = "Test content"
+            mock_generate.return_value = "2023.10.12 - Test Doc.pdf"
+
+            with patch('builtins.print') as mock_print:
+                pdf_renamer.process_pdfs(tmp_path, test_mode=True)
+                assert pdf_file.exists()
+                assert not (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
+                mock_print.assert_any_call(f"Original filename: {pdf_file.name}")
+                mock_print.assert_any_call(f"New filename: {mock_generate.return_value}")
+
+    def test_main_with_test_mode(self, tmp_path):
+        runner = CliRunner()
+        with patch('pdf_renamer.process_pdfs') as mock_process:
+            result = runner.invoke(pdf_renamer.main, ['--test-mode', str(tmp_path)])
+            assert result.exit_code == 0
+            mock_process.assert_called_once_with(Path(tmp_path), True)
     def test_empty_directory(self, tmp_path):
-        pdf_renamer.process_pdfs(tmp_path)
+        pdf_renamer.process_pdfs(tmp_path, test_mode=False)
         assert len(list(tmp_path.iterdir())) == 0
 
     def test_successful_processing(self, tmp_path):
@@ -94,7 +107,7 @@ class TestProcessPdfs:
             mock_extract.return_value = "Test content"
             mock_generate.return_value = "2023.10.12 - Test Doc.pdf"
             
-            pdf_renamer.process_pdfs(tmp_path)
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
             assert not pdf_file.exists()
             assert (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
 
@@ -103,7 +116,7 @@ class TestProcessPdfs:
         pdf_file = tmp_path / "regular.pdf"
         pdf_file.write_bytes(b"%PDF-1.4")
         
-        pdf_renamer.process_pdfs(tmp_path)
+        pdf_renamer.process_pdfs(tmp_path, test_mode=False)
         assert pdf_file.exists()  # File should not be processed
 
     def test_permission_error(self, tmp_path):
@@ -111,5 +124,5 @@ class TestProcessPdfs:
         pdf_file.write_bytes(b"%PDF-1.4")
         
         with patch('pathlib.Path.rename', side_effect=PermissionError):
-            pdf_renamer.process_pdfs(tmp_path)
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
             assert pdf_file.exists()  # Original file should still exist

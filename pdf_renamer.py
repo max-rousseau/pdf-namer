@@ -1,4 +1,4 @@
-import argparse
+import click
 import re
 import os
 from pathlib import Path
@@ -6,20 +6,6 @@ import requests
 from tqdm import tqdm
 import pypdf
 
-def parse_arguments() -> argparse.Namespace:
-    """
-    Parses the command-line arguments.
-
-    Returns:
-        argparse.Namespace: The parsed arguments.
-    """
-    parser = argparse.ArgumentParser(description="Process PDF files in a directory.")
-    parser.add_argument(
-        "scan_directory",
-        type=str,
-        help="Directory to scan for PDF files."
-    )
-    return parser.parse_args()
 
 def extract_pdf_text(pdf_path: Path) -> str:
     """
@@ -80,7 +66,7 @@ def generate_new_filename(text: str, original_file: Path) -> str:
 
     return new_filename
 
-def process_pdfs(directory: Path):
+def process_pdfs(directory: Path, test_mode: bool):
     """
     Processes PDF files in the given directory.
 
@@ -103,15 +89,22 @@ def process_pdfs(directory: Path):
         try:
             text = extract_pdf_text(pdf_file)
             new_filename = generate_new_filename(text, pdf_file)
-            pdf_file.rename(directory / new_filename)
+            if test_mode:
+                print(f"Original filename: {pdf_file.name}")
+                print(f"New filename: {new_filename}")
+            else:
+                pdf_file.rename(directory / new_filename)
         except requests.exceptions.RequestException as e:
             print(f"Network error processing {pdf_file.name}: {e}")
         except Exception as e:
             print(f"Error processing {pdf_file.name}: {e}")
 
-def main():
-    args = parse_arguments()
-    process_pdfs(Path(args.scan_directory))
+@click.command()
+@click.argument('scan_directory', type=click.Path(exists=True, file_okay=False))
+@click.option('--test-mode', is_flag=True, help='Run in test mode without renaming files.')
+def main(scan_directory, test_mode):
+    """Process PDF files in the provided directory."""
+    process_pdfs(Path(scan_directory), test_mode)
 
 if __name__ == "__main__":
     main()

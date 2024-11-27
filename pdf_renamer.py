@@ -42,8 +42,10 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
 
     max_summarized_length = 17
 
-    # Prepare the prompt for the Ollama service
-    prompt = "sample prompt"
+    # Read the prompt from 'prompt.md'
+    prompt_path = Path('prompt.md')
+    prompt = prompt_path.read_text()
+    prompt = prompt.format(text=text)
 
     # Send the request to the Ollama service
     response = requests.post(

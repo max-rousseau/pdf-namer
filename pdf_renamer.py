@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 import requests
 import pypdf
+from click import style
 
 DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
 
@@ -47,7 +48,8 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     prompt = prompt_path.read_text()
     prompt = prompt.format(text=text)
 
-    # Print prompt length
+    print(style("="*50, fg="blue"))
+    print(style("Prompt Analysis", fg="green", bold=True))
     print(f"Sending prompt to Ollama (length: {len(prompt)} characters)")
 
     # Send the request to the Ollama service and measure time
@@ -66,6 +68,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     response.raise_for_status()
     elapsed_time = time.time() - start_time
     print(f"Received response from Ollama in {elapsed_time:.2f} seconds")
+    print(style("="*50, fg="blue"))
     try:
         data = response.json()
         if "response" not in data:
@@ -129,7 +132,8 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
 
     # Process each PDF file
     for pdf_file in pdf_files:
-        print(f"Processing {pdf_file.name}...")
+        print(style("="*50, fg="blue"))
+        print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
             new_filename = generate_new_filename(text, pdf_file, model)

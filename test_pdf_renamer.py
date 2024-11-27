@@ -89,21 +89,31 @@ class TestGenerateNewFilename:
             assert ' - ' in new_filename
 
 class TestProcessPdfs:
-    def test_process_pdfs_test_mode(self, tmp_path):
+    def test_process_pdfs_test_mode_with_confirmation(self, tmp_path):
         pdf_file = tmp_path / "2023_10_12_13_14_15_sample.pdf"
         pdf_file.write_bytes(b"%PDF-1.4")
 
         with patch('pdf_renamer.extract_pdf_text') as mock_extract, \
-             patch('pdf_renamer.generate_new_filename') as mock_generate:
+             patch('pdf_renamer.generate_new_filename') as mock_generate, \
+             patch('click.confirm') as mock_confirm:
+            
             mock_extract.return_value = "Test content"
             mock_generate.return_value = "2023.10.12 - Test Doc.pdf"
+            
+            # Test when user confirms rename
+            mock_confirm.return_value = True
+            pdf_renamer.process_pdfs(tmp_path, test_mode=True, model="llama2")
+            assert not pdf_file.exists()
+            assert (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
 
-            with patch('builtins.print') as mock_print:
-                pdf_renamer.process_pdfs(tmp_path, test_mode=True, model="llama2")
-                assert pdf_file.exists()
-                assert not (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
-                mock_print.assert_any_call(f"Original filename: {pdf_file.name}")
-                mock_print.assert_any_call(f"New filename: {mock_generate.return_value}")
+            # Reset the test environment
+            (tmp_path / "2023.10.12 - Test Doc.pdf").rename(pdf_file)
+            
+            # Test when user declines rename
+            mock_confirm.return_value = False
+            pdf_renamer.process_pdfs(tmp_path, test_mode=True, model="llama2")
+            assert pdf_file.exists()
+            assert not (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
 
     def test_main_with_test_mode(self, tmp_path):
         runner = CliRunner()

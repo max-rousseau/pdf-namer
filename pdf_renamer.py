@@ -146,6 +146,11 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
             if test_mode:
                 print(f"Original filename: {pdf_file.name}")
                 print(f"New filename: {new_filename}")
+                if click.confirm('Do you want to rename this file?', default=False):
+                    pdf_file.rename(directory / new_filename)
+                    print(style("File renamed successfully", fg="green"))
+                else:
+                    print(style("Skipping file rename", fg="yellow"))
             else:
                 pdf_file.rename(directory / new_filename)
         except requests.exceptions.RequestException as e:

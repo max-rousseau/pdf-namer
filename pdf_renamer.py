@@ -60,7 +60,7 @@ def generate_new_filename(text: str, original_file: Path) -> str:
             "prompt": f"{prompt}\n\n{text}",
             "stream": False,
         },
-        timeout=30,
+        timeout=120,
     )
     response.raise_for_status()
     data = response.json()

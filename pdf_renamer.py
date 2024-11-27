@@ -4,7 +4,6 @@ import json
 import time
 from pathlib import Path
 import requests
-from tqdm import tqdm
 import pypdf
 
 DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
@@ -128,8 +127,9 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
         and date_pattern.search(file.name)
     ]
 
-    # Process each PDF file with a progress bar
-    for pdf_file in tqdm(pdf_files, desc="Processing PDFs"):
+    # Process each PDF file
+    for pdf_file in pdf_files:
+        print(f"Processing {pdf_file.name}...")
         try:
             text = extract_pdf_text(pdf_file)
             new_filename = generate_new_filename(text, pdf_file, model)

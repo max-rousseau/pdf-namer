@@ -63,8 +63,25 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     data = response.json()
     if "response" not in data:
         raise ValueError("The API response does not contain the 'response' key.")
-    else:
+    
+    # Parse the JSON response
+    try:
         data = json.loads(data["response"])
+    except json.JSONDecodeError:
+        raise ValueError("Invalid JSON response from API")
+
+    # Validate JSON structure
+    expected_keys = {'date', 'filename'}
+    actual_keys = set(data.keys())
+    
+    if not expected_keys.issubset(actual_keys):
+        missing_keys = expected_keys - actual_keys
+        raise ValueError(f"Missing required keys in response: {missing_keys}")
+    
+    if actual_keys != expected_keys:
+        extra_keys = actual_keys - expected_keys
+        raise ValueError(f"Unexpected extra keys in response: {extra_keys}")
+
     # Clean and validate the summarized name
     date = data['date'].strip() if data['date'] else "YYYY.MM.DD"
     summarized_name = f"{date} - {data['filename'].strip()}"

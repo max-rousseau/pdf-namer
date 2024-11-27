@@ -43,7 +43,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     max_summarized_length = 17
 
     # Read the prompt from 'prompt.md'
-    prompt_path = Path('prompt.md')
+    prompt_path = Path("prompt.md")
     prompt = prompt_path.read_text()
     prompt = prompt.format(text=text)
 
@@ -57,15 +57,17 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
             "options": {"temperature": 0.5},
             "format": "json",
         },
-        timeout=300,
+        timeout=600,
     )
     response.raise_for_status()
     try:
         data = response.json()
         if "response" not in data:
-            print("Error: The API response does not contain the 'response' key.")
+            print(
+                f"Error: The API response does not contain the 'response' key.\n{data}"
+            )
             return None
-        
+
         # Parse the JSON response
         try:
             data = json.loads(data["response"])
@@ -74,21 +76,21 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
             return None
 
         # Validate JSON structure
-        expected_keys = {'date', 'filename'}
+        expected_keys = {"date", "filename"}
         actual_keys = set(data.keys())
-        
+
         if not expected_keys.issubset(actual_keys):
             missing_keys = expected_keys - actual_keys
-            print(f"Error: Missing required keys in response: {missing_keys}")
+            print(f"Error: Missing required keys in response: {missing_keys}\n{data}")
             return None
-        
+
         if actual_keys != expected_keys:
             extra_keys = actual_keys - expected_keys
-            print(f"Error: Unexpected extra keys in response: {extra_keys}")
+            print(f"Error: Unexpected extra keys in response: {extra_keys}\n{data}")
             return None
 
         # Clean and validate the summarized name
-        date = data['date'].strip() if data['date'] else "YYYY.MM.DD"
+        date = data["date"].strip() if data["date"] else "YYYY.MM.DD"
         summarized_name = f"{date} - {data['filename'].strip()}"
 
         # Construct the new filename

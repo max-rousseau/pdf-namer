@@ -1,16 +1,24 @@
 import os
 import time
 import torch
-from transformers import AutoModelForCausalLM, LlamaTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer
 
 models_path = os.path.expanduser("~/.llama/checkpoints/")
 torch.manual_seed(42)  # For reproducibility
 model_name = "Llama3.2-3B-Instruct"
 model_path = os.path.join(models_path, model_name)
 
+# Print the files in the model directory
+print("Files in model directory:", os.listdir(model_path))
+
 # Initialize tokenizer and model
-tokenizer = LlamaTokenizer.from_pretrained(model_path, use_fast=False)
-model = AutoModelForCausalLM.from_pretrained(
+tokenizer = LlamaTokenizer.from_pretrained(
+    model_path,
+    use_fast=False,
+    tokenizer_file=os.path.join(model_path, "tokenizer.model"),
+    legacy=True
+)
+model = LlamaForCausalLM.from_pretrained(
     model_path, device_map="auto"
 )
 

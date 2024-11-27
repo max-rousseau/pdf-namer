@@ -1,7 +1,7 @@
 import os
 import time
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, LlamaTokenizer
 
 models_path = os.path.expanduser("~/.llama/checkpoints/")
 torch.manual_seed(42)  # For reproducibility
@@ -9,7 +9,7 @@ model_name = "Llama3.2-3B-Instruct"
 model_path = os.path.join(models_path, model_name)
 
 # Initialize tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(model_path)
+tokenizer = LlamaTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(
     model_path, device_map="auto"
 )

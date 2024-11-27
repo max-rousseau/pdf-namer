@@ -51,17 +51,21 @@ def generate_new_filename(text: str, original_file: Path) -> str:
 
     # Send the request to the Ollama service
     response = requests.post(
-        "http://127.0.0.1:11434/generate",
+        "http://127.0.0.1:11434/api/generate",
         json={
-            "model": "llama3.1:70b-instruct-fp16",
-            "prompt": f"{prompt}\n\n{text}"
-        }
+            "model": "llama2",
+            "prompt": f"{prompt}\n\n{text}",
+            "stream": False
+        },
+        timeout=30
     )
     response.raise_for_status()
-    result = response.json()
-
+    data = response.json()
+    if "response" not in data:
+        raise ValueError("The API response does not contain the 'response' key.")
+    
     # Construct the new filename
-    summarized_name = result["response"].strip()
+    summarized_name = data["response"].strip()
     new_filename = f"{date_formatted} - {summarized_name}.pdf"
 
     return new_filename

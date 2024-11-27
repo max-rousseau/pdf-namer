@@ -40,7 +40,12 @@ class TestGenerateNewFilename:
         sample_text = "Sample PDF content"
         original_file = Path("2023_10_12_13_14_15_sample.pdf")
         with patch('requests.post') as mock_post:
-            mock_post.return_value.json.return_value = {"response": "Sample Name"}
+            mock_post.return_value.json.return_value = {
+                "model": "llama2",
+                "created_at": "2023-11-10T12:34:56Z",
+                "response": "Sample Name",
+                "done": True
+            }
             mock_post.return_value.raise_for_status = MagicMock()
             new_filename = pdf_renamer.generate_new_filename(sample_text, original_file)
             assert new_filename == "2023.10.12 - Sample Name.pdf"
@@ -67,7 +72,7 @@ class TestGenerateNewFilename:
         with patch('requests.post') as mock_post:
             mock_post.return_value.json.return_value = {}  # Missing 'response' key
             mock_post.return_value.raise_for_status = MagicMock()
-            with pytest.raises(KeyError):
+            with pytest.raises(ValueError):
                 pdf_renamer.generate_new_filename(sample_text, original_file)
 
 class TestProcessPdfs:

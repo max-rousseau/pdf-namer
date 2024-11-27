@@ -60,34 +60,42 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
         timeout=300,
     )
     response.raise_for_status()
-    data = response.json()
-    if "response" not in data:
-        raise ValueError("The API response does not contain the 'response' key.")
-    
-    # Parse the JSON response
     try:
-        data = json.loads(data["response"])
-    except json.JSONDecodeError:
-        raise ValueError("Invalid JSON response from API")
+        data = response.json()
+        if "response" not in data:
+            print("Error: The API response does not contain the 'response' key.")
+            return None
+        
+        # Parse the JSON response
+        try:
+            data = json.loads(data["response"])
+        except json.JSONDecodeError:
+            print("Error: Invalid JSON response from API")
+            return None
 
-    # Validate JSON structure
-    expected_keys = {'date', 'filename'}
-    actual_keys = set(data.keys())
-    
-    if not expected_keys.issubset(actual_keys):
-        missing_keys = expected_keys - actual_keys
-        raise ValueError(f"Missing required keys in response: {missing_keys}")
-    
-    if actual_keys != expected_keys:
-        extra_keys = actual_keys - expected_keys
-        raise ValueError(f"Unexpected extra keys in response: {extra_keys}")
+        # Validate JSON structure
+        expected_keys = {'date', 'filename'}
+        actual_keys = set(data.keys())
+        
+        if not expected_keys.issubset(actual_keys):
+            missing_keys = expected_keys - actual_keys
+            print(f"Error: Missing required keys in response: {missing_keys}")
+            return None
+        
+        if actual_keys != expected_keys:
+            extra_keys = actual_keys - expected_keys
+            print(f"Error: Unexpected extra keys in response: {extra_keys}")
+            return None
 
-    # Clean and validate the summarized name
-    date = data['date'].strip() if data['date'] else "YYYY.MM.DD"
-    summarized_name = f"{date} - {data['filename'].strip()}"
+        # Clean and validate the summarized name
+        date = data['date'].strip() if data['date'] else "YYYY.MM.DD"
+        summarized_name = f"{date} - {data['filename'].strip()}"
 
-    # Construct the new filename
-    return summarized_name
+        # Construct the new filename
+        return summarized_name
+    except Exception as e:
+        print(f"Error generating filename: {str(e)}")
+        return None
 
 
 def process_pdfs(directory: Path, test_mode: bool, model: str):

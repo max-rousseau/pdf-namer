@@ -72,8 +72,8 @@ class TestGenerateNewFilename:
         with patch('requests.post') as mock_post:
             mock_post.return_value.json.return_value = {}  # Missing 'response' key
             mock_post.return_value.raise_for_status = MagicMock()
-            with pytest.raises(ValueError):
-                pdf_renamer.generate_new_filename(sample_text, original_file)
+            result = pdf_renamer.generate_new_filename(sample_text, original_file)
+            assert result is None
 
     def test_filename_length_validation(self):
         sample_text = "Sample PDF content"

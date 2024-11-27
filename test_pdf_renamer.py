@@ -75,6 +75,19 @@ class TestGenerateNewFilename:
             with pytest.raises(ValueError):
                 pdf_renamer.generate_new_filename(sample_text, original_file)
 
+    def test_filename_length_validation(self):
+        sample_text = "Sample PDF content"
+        original_file = Path("2023_10_12_13_14_15_sample.pdf")
+        with patch('requests.post') as mock_post:
+            mock_post.return_value.json.return_value = {
+                "response": "This is a very long filename that should be truncated"
+            }
+            mock_post.return_value.raise_for_status = MagicMock()
+            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file)
+            assert len(new_filename) <= 32
+            assert new_filename.endswith('.pdf')
+            assert ' - ' in new_filename
+
 class TestProcessPdfs:
     def test_process_pdfs_test_mode(self, tmp_path):
         pdf_file = tmp_path / "2023_10_12_13_14_15_sample.pdf"

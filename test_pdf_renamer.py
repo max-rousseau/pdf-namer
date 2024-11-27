@@ -47,7 +47,7 @@ class TestGenerateNewFilename:
                 "done": True
             }
             mock_post.return_value.raise_for_status = MagicMock()
-            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file)
+            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
             assert new_filename == "2023.10.12 - Sample Name.pdf"
 
     def test_network_error(self):
@@ -99,7 +99,7 @@ class TestProcessPdfs:
             mock_generate.return_value = "2023.10.12 - Test Doc.pdf"
 
             with patch('builtins.print') as mock_print:
-                pdf_renamer.process_pdfs(tmp_path, test_mode=True)
+                pdf_renamer.process_pdfs(tmp_path, test_mode=True, model="llama2")
                 assert pdf_file.exists()
                 assert not (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
                 mock_print.assert_any_call(f"Original filename: {pdf_file.name}")
@@ -108,9 +108,9 @@ class TestProcessPdfs:
     def test_main_with_test_mode(self, tmp_path):
         runner = CliRunner()
         with patch('pdf_renamer.process_pdfs') as mock_process:
-            result = runner.invoke(pdf_renamer.main, ['--test-mode', str(tmp_path)])
+            result = runner.invoke(pdf_renamer.main, ['--test-mode', '--model', 'llama2', str(tmp_path)])
             assert result.exit_code == 0
-            mock_process.assert_called_once_with(Path(tmp_path), True)
+            mock_process.assert_called_once_with(Path(tmp_path), True, 'llama2')
     def test_empty_directory(self, tmp_path):
         pdf_renamer.process_pdfs(tmp_path, test_mode=False)
         assert len(list(tmp_path.iterdir())) == 0

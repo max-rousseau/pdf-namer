@@ -6,6 +6,8 @@ import requests
 from tqdm import tqdm
 import pypdf
 
+DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
+
 
 def extract_pdf_text(pdf_path: Path) -> str:
     """
@@ -25,13 +27,14 @@ def extract_pdf_text(pdf_path: Path) -> str:
     return text
 
 
-def generate_new_filename(text: str, original_file: Path) -> str:
+def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     """
     Generates a new filename based on PDF content and date extracted from the original filename.
 
     Args:
         text (str): The content of the PDF file.
         original_file (Path): The original PDF file.
+        model (str): The LLM model to use for generating filenames.
 
     Returns:
         str: The new filename.
@@ -61,7 +64,7 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     response = requests.post(
         "http://127.0.0.1:11434/api/generate",
         json={
-            "model": "llama3.1:70b-instruct-q8_0",
+            "model": model,
             "prompt": f"{prompt}\n\n{text}",
             "stream": False,
         },
@@ -91,12 +94,14 @@ def generate_new_filename(text: str, original_file: Path) -> str:
     return new_filename
 
 
-def process_pdfs(directory: Path, test_mode: bool):
+def process_pdfs(directory: Path, test_mode: bool, model: str):
     """
     Processes PDF files in the given directory.
 
     Args:
         directory (Path): The directory containing PDF files.
+        test_mode (bool): Whether to run in test mode without renaming
+        model (str): The LLM model to use for generating filenames
     """
     # Regular expression to match the date pattern
     date_pattern = re.compile(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}")
@@ -114,7 +119,7 @@ def process_pdfs(directory: Path, test_mode: bool):
     for pdf_file in tqdm(pdf_files, desc="Processing PDFs"):
         try:
             text = extract_pdf_text(pdf_file)
-            new_filename = generate_new_filename(text, pdf_file)
+            new_filename = generate_new_filename(text, pdf_file, model)
             if test_mode:
                 print(f"Original filename: {pdf_file.name}")
                 print(f"New filename: {new_filename}")
@@ -131,9 +136,14 @@ def process_pdfs(directory: Path, test_mode: bool):
 @click.option(
     "--test-mode", is_flag=True, help="Run in test mode without renaming files."
 )
-def main(scan_directory, test_mode):
+@click.option(
+    "--model",
+    default=DEFAULT_MODEL,
+    help="Specify the LLM model to use for generating filenames."
+)
+def main(scan_directory, test_mode, model):
     """Process PDF files in the provided directory."""
-    process_pdfs(Path(scan_directory), test_mode)
+    process_pdfs(Path(scan_directory), test_mode, model)
 
 
 if __name__ == "__main__":

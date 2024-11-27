@@ -15,8 +15,7 @@ print("Files in model directory:", os.listdir(model_path))
 tokenizer = LlamaTokenizer.from_pretrained(
     model_path,
     use_fast=False,
-    tokenizer_file=os.path.join(model_path, "tokenizer.model"),
-    legacy=True
+    legacy=False
 )
 model = LlamaForCausalLM.from_pretrained(
     model_path, device_map="auto"

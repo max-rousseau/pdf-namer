@@ -3,7 +3,7 @@ import sys
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 import requests
-import PyPDF2
+import pypdf
 import pdf_renamer
 
 class TestParseArguments:
@@ -21,7 +21,7 @@ class TestExtractPdfText:
     def test_valid_pdf(self):
         mock_pdf_path = MagicMock(spec=Path)
         mock_pdf_path.open.return_value.__enter__.return_value = MagicMock()
-        with patch('PyPDF2.PdfReader') as MockPdfReader:
+        with patch('pypdf.PdfReader') as MockPdfReader:
             mock_reader_instance = MockPdfReader.return_value
             mock_reader_instance.pages = [MagicMock(), MagicMock()]
             mock_reader_instance.pages[0].extract_text.return_value = "Page 1"
@@ -31,7 +31,7 @@ class TestExtractPdfText:
 
     def test_pdf_without_text(self):
         mock_pdf_path = MagicMock(spec=Path)
-        with patch('PyPDF2.PdfReader') as MockPdfReader:
+        with patch('pypdf.PdfReader') as MockPdfReader:
             mock_reader_instance = MockPdfReader.return_value
             mock_reader_instance.pages = [MagicMock()]
             mock_reader_instance.pages[0].extract_text.return_value = ""
@@ -40,8 +40,8 @@ class TestExtractPdfText:
 
     def test_corrupted_pdf(self):
         mock_pdf_path = MagicMock(spec=Path)
-        with patch('PyPDF2.PdfReader', side_effect=PyPDF2.errors.PdfReadError):
-            with pytest.raises(PyPDF2.errors.PdfReadError):
+        with patch('pypdf.PdfReader', side_effect=pypdf.errors.PdfReadError):
+            with pytest.raises(pypdf.errors.PdfReadError):
                 pdf_renamer.extract_pdf_text(mock_pdf_path)
 
 class TestGenerateNewFilename:

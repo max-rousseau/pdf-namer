@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import requests
 from tqdm import tqdm
-import PyPDF2
+import pypdf
 
 def parse_arguments() -> argparse.Namespace:
     """
@@ -33,7 +33,7 @@ def extract_pdf_text(pdf_path: Path) -> str:
     """
     text = ""
     with pdf_path.open("rb") as file:
-        reader = PyPDF2.PdfReader(file)
+        reader = pypdf.PdfReader(file)
         for page in reader.pages:
             text += page.extract_text() or ""
     return text

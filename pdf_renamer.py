@@ -66,7 +66,8 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     else:
         data = json.loads(data["response"])
     # Clean and validate the summarized name
-    summarized_name = f"{data['date'].strip()} - {data['filename'].strip()}"
+    date = data['date'].strip() if data['date'] else "YYYY.MM.DD"
+    summarized_name = f"{date} - {data['filename'].strip()}"
 
     # Construct the new filename
     return summarized_name

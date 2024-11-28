@@ -85,8 +85,12 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
 
     # Calculate required context window
     context_window = calculate_context_window(model, prompt)
+    # Calculate tokens for performance tracking
+    encoding = tiktoken.encoding_for_model("gpt-4")
+    token_count = len(encoding.encode(prompt))
+    
     print(
-        f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens)"
+        f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens, input tokens: {token_count})"
     )
 
     # Send the request to the Ollama service and measure time
@@ -104,7 +108,8 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     )
     response.raise_for_status()
     elapsed_time = time.time() - start_time
-    print(f"Received response from Ollama in {elapsed_time:.2f} seconds")
+    tokens_per_second = token_count / elapsed_time
+    print(f"Received response from Ollama in {elapsed_time:.2f} seconds ({tokens_per_second:.1f} tokens/second)")
     print(style("=" * 50, fg="blue"))
     try:
         data = response.json()

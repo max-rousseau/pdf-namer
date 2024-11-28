@@ -85,5 +85,6 @@ This project is licensed under the BSD 2-Clause License - see the [LICENSE](LICE
 
 ## Acknowledgments
 
+- More than 90% of this project was developed using [Aider](https://github.com/Aider-AI/aider), an AI pair programming tool
 - Uses the Ollama API for LLaMA model integration
 - Built with PyPDF for PDF text extraction

@@ -206,11 +206,16 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
             print(f"Original filename:\t{pdf_file.name}")
             print(f"New filename:\t{new_filename}")
 
-            if click.confirm("Do you want to rename this file?", default=False):
-                pdf_file.rename(directory / new_filename)
+            if test_mode:
+                if click.confirm("Do you want to rename this file?", default=False):
+                    pdf_file.rename(directory / f"{new_filename}.pdf")
+                    print(style("File renamed successfully", fg="green"))
+                else:
+                    print(style("Skipping file rename in test mode", fg="yellow"))
+            else:
+                # In non-test mode, rename without confirmation
+                pdf_file.rename(directory / f"{new_filename}.pdf")
                 print(style("File renamed successfully", fg="green"))
-            elif test_mode:
-                print(style("Skipping file rename in test mode", fg="yellow"))
 
         except requests.exceptions.RequestException as e:
             print(f"Network error processing {pdf_file.name}: {e}")

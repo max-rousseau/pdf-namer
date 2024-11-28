@@ -52,15 +52,17 @@ class TestGenerateNewFilename:
         original_file = Path("2023_10_12_13_14_15_sample.pdf")
         with patch('requests.post', side_effect=requests.exceptions.RequestException("Network error")):
             with pytest.raises(requests.exceptions.RequestException):
-                pdf_renamer.generate_new_filename(sample_text, original_file)
+                pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
 
     def test_invalid_date_format(self):
         sample_text = "Sample PDF content"
         original_file = Path("invalid_filename.pdf")
         with patch('requests.post') as mock_post:
-            mock_post.return_value.json.return_value = {"response": "Sample Name"}
+            mock_post.return_value.json.return_value = {
+                "response": '{"date": "UnknownDate", "filename": "Sample Name"}'
+            }
             mock_post.return_value.raise_for_status = MagicMock()
-            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file)
+            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
             assert new_filename.startswith("UnknownDate - ")
 
     def test_missing_response_key(self):
@@ -91,7 +93,7 @@ class TestContextWindow:
         model = "llama3.1:70b-instruct-q8_0"
         prompt = "Short prompt"
         result = pdf_renamer.calculate_context_window(model, prompt)
-        assert result == 1011  # prompt length + 1000 buffer
+        assert result == len(prompt) + 1000  # prompt length + 1000 buffer
 
     def test_calculate_context_window_long_prompt(self):
         model = "llama3.1:70b-instruct-q8_0"
@@ -103,7 +105,7 @@ class TestContextWindow:
         model = "unknown_model"
         prompt = "Test prompt"
         result = pdf_renamer.calculate_context_window(model, prompt)
-        assert result == 2048  # Should return default size
+        assert result == len(prompt) + 1000  # Should use default buffer size
 
 class TestProcessPdfs:
     def test_process_pdfs_test_mode_with_confirmation(self, tmp_path):
@@ -146,7 +148,7 @@ class TestProcessPdfs:
             assert result.exit_code == 0
             mock_process.assert_called_once_with(Path(tmp_path), False, 'llama2', True)
     def test_empty_directory(self, tmp_path):
-        pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+        pdf_renamer.process_pdfs(tmp_path, test_mode=False, model="llama2")
         assert len(list(tmp_path.iterdir())) == 0
 
     def test_successful_processing(self, tmp_path):
@@ -159,7 +161,7 @@ class TestProcessPdfs:
             mock_extract.return_value = "Test content"
             mock_generate.return_value = "2023.10.12 - Test Doc.pdf"
             
-            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False, model="llama2")
             assert not pdf_file.exists()
             assert (tmp_path / "2023.10.12 - Test Doc.pdf").exists()
 
@@ -170,7 +172,7 @@ class TestProcessPdfs:
         
         with patch('pdf_renamer.extract_pdf_text') as mock_extract:
             mock_extract.return_value = "x" * 10001  # Create text longer than 10000 chars
-            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False, model="llama2")
             assert pdf_file.exists()  # File should not be processed due to length
 
     def test_skip_non_matching_files(self, tmp_path):
@@ -178,7 +180,7 @@ class TestProcessPdfs:
         pdf_file = tmp_path / "regular.pdf"
         pdf_file.write_bytes(b"%PDF-1.4")
         
-        pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+        pdf_renamer.process_pdfs(tmp_path, test_mode=False, model="llama2")
         assert pdf_file.exists()  # File should not be processed
 
     def test_permission_error(self, tmp_path):
@@ -186,5 +188,5 @@ class TestProcessPdfs:
         pdf_file.write_bytes(b"%PDF-1.4")
         
         with patch('pathlib.Path.rename', side_effect=PermissionError):
-            pdf_renamer.process_pdfs(tmp_path, test_mode=False)
+            pdf_renamer.process_pdfs(tmp_path, test_mode=False, model="llama2")
             assert pdf_file.exists()  # Original file should still exist

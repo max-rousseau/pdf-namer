@@ -76,9 +76,10 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
 
     print(style("=" * 50, fg="blue"))
     print(style("Prompt Analysis", fg="green", bold=True))
-    print(f"Sending prompt to Ollama (length: {len(prompt)} characters)")
-
+    
     # Calculate required context window
+    context_window = calculate_context_window(model, prompt)
+    print(f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens)")
     context_window = calculate_context_window(model, prompt)
     
     # Send the request to the Ollama service and measure time

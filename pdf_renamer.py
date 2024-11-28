@@ -160,27 +160,21 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
         test_mode (bool): Whether to run in test mode without renaming
         model (str): The LLM model to use for generating filenames
     """
-    # Regular expression to match the date pattern
-    date_pattern = re.compile(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}")
+    # Get all PDF files first
+    pdf_files = [
+        file
+        for file in directory.iterdir()
+        if file.is_file() and file.suffix.lower() == ".pdf"
+    ]
 
-    # Find PDF files based on the all_files flag
-    if all_files:
-        pdf_files = [
-            file
-            for file in directory.iterdir()
-            if file.is_file() and file.suffix.lower() == ".pdf"
-        ]
-        if not pdf_files:
-            print(style("No PDF files found in the directory", fg="yellow"))
-            return
-    else:
-        pdf_files = [
-            file
-            for file in directory.iterdir()
-            if file.is_file()
-            and file.suffix.lower() == ".pdf"
-            and date_pattern.search(file.name)
-        ]
+    if not pdf_files:
+        print(style("No PDF files found in the directory", fg="yellow"))
+        return
+
+    # Filter by date pattern if not processing all files
+    if not all_files:
+        date_pattern = re.compile(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}")
+        pdf_files = [file for file in pdf_files if date_pattern.search(file.name)]
         if not pdf_files:
             print(style("No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)", fg="yellow"))
             return

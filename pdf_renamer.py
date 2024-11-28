@@ -2,6 +2,7 @@ import click
 import re
 import json
 import time
+import tiktoken
 from pathlib import Path
 import requests
 import pypdf
@@ -9,6 +10,30 @@ from click import style
 
 DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
 MODEL_CONTEXT_MAP = {"llama3.1:70b-instruct-q8_0": 128000}
+
+def calculate_context_window(model: str, prompt: str) -> int:
+    """
+    Calculate the minimum required context window size for the given prompt.
+    
+    Args:
+        model (str): The model name
+        prompt (str): The prompt text
+        
+    Returns:
+        int: The required context window size
+    """
+    try:
+        encoding = tiktoken.encoding_for_model("gpt-4")  # Use gpt-4 encoding as default
+        token_count = len(encoding.encode(prompt))
+        
+        # Get max context size for model, default to 2048 if not found
+        max_context = MODEL_CONTEXT_MAP.get(model, 2048)
+        
+        # Return the minimum required size, capped at model's max
+        return min(token_count + 1000, max_context)  # Add 1000 tokens buffer for response
+    except Exception as e:
+        print(f"Error calculating context window: {str(e)}")
+        return 2048  # Return default size on error
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -53,6 +78,9 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     print(style("Prompt Analysis", fg="green", bold=True))
     print(f"Sending prompt to Ollama (length: {len(prompt)} characters)")
 
+    # Calculate required context window
+    context_window = calculate_context_window(model, prompt)
+    
     # Send the request to the Ollama service and measure time
     start_time = time.time()
     response = requests.post(
@@ -61,7 +89,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0.5, "num_ctx": window},
+            "options": {"temperature": 0.5, "num_ctx": context_window},
             "format": "json",
         },
         timeout=600,

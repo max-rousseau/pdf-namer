@@ -88,7 +88,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     # Calculate tokens for performance tracking
     encoding = tiktoken.encoding_for_model("gpt-4")
     token_count = len(encoding.encode(prompt))
-    
+
     print(
         f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens, input tokens: {token_count})"
     )
@@ -109,7 +109,9 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     response.raise_for_status()
     elapsed_time = time.time() - start_time
     tokens_per_second = token_count / elapsed_time
-    print(f"Received response from Ollama in {elapsed_time:.2f} seconds ({tokens_per_second:.1f} tokens/second)")
+    print(
+        f"Received response from Ollama in {elapsed_time:.2f} seconds ({tokens_per_second:.1f} tokens/second)"
+    )
     print(style("=" * 50, fg="blue"))
     try:
         data = response.json()
@@ -176,7 +178,12 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
         date_pattern = re.compile(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}")
         pdf_files = [file for file in pdf_files if date_pattern.search(file.name)]
         if not pdf_files:
-            print(style("No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)", fg="yellow"))
+            print(
+                style(
+                    "No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)",
+                    fg="yellow",
+                )
+            )
             return
 
     # Process each PDF file
@@ -185,14 +192,6 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
         print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
-            # if len(text) > 10000:
-            #     print(
-            #         style(
-            #             "Skipping: PDF content exceeds 10,000 characters", fg="yellow"
-            #         )
-            #     )
-            #     print(f"Content length: {len(text)} characters")
-            #     continue
             new_filename = generate_new_filename(text, pdf_file, model)
             if not new_filename:
                 print(f"Error processing {pdf_file.name}. Ignoring.")
@@ -202,13 +201,11 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
             print(f"New filename:\t{new_filename}")
 
             if test_mode:
+                print(style("Skipping file rename", fg="yellow"))
+            else:
                 if click.confirm("Do you want to rename this file?", default=False):
                     pdf_file.rename(directory / new_filename)
                     print(style("File renamed successfully", fg="green"))
-                else:
-                    print(style("Skipping file rename", fg="yellow"))
-            else:
-                pdf_file.rename(directory / new_filename)
 
         except requests.exceptions.RequestException as e:
             print(f"Network error processing {pdf_file.name}: {e}")

@@ -120,7 +120,14 @@ class TestProcessPdfs:
         with patch('pdf_renamer.process_pdfs') as mock_process:
             result = runner.invoke(pdf_renamer.main, ['--test-mode', '--model', 'llama2', str(tmp_path)])
             assert result.exit_code == 0
-            mock_process.assert_called_once_with(Path(tmp_path), True, 'llama2')
+            mock_process.assert_called_once_with(Path(tmp_path), True, 'llama2', False)
+
+    def test_main_with_all_files(self, tmp_path):
+        runner = CliRunner()
+        with patch('pdf_renamer.process_pdfs') as mock_process:
+            result = runner.invoke(pdf_renamer.main, ['--all-files', '--model', 'llama2', str(tmp_path)])
+            assert result.exit_code == 0
+            mock_process.assert_called_once_with(Path(tmp_path), False, 'llama2', True)
     def test_empty_directory(self, tmp_path):
         pdf_renamer.process_pdfs(tmp_path, test_mode=False)
         assert len(list(tmp_path.iterdir())) == 0

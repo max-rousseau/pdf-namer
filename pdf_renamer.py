@@ -151,7 +151,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
         return None
 
 
-def process_pdfs(directory: Path, test_mode: bool, model: str):
+def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool = False):
     """
     Processes PDF files in the given directory.
 
@@ -163,18 +163,27 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
     # Regular expression to match the date pattern
     date_pattern = re.compile(r"\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}")
 
-    # Find all PDF files matching the date pattern
-    pdf_files = [
-        file
-        for file in directory.iterdir()
-        if file.is_file()
-        and file.suffix.lower() == ".pdf"
-        and date_pattern.search(file.name)
-    ]
-
-    if not pdf_files:
-        print(style("No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)", fg="yellow"))
-        return
+    # Find PDF files based on the all_files flag
+    if all_files:
+        pdf_files = [
+            file
+            for file in directory.iterdir()
+            if file.is_file() and file.suffix.lower() == ".pdf"
+        ]
+        if not pdf_files:
+            print(style("No PDF files found in the directory", fg="yellow"))
+            return
+    else:
+        pdf_files = [
+            file
+            for file in directory.iterdir()
+            if file.is_file()
+            and file.suffix.lower() == ".pdf"
+            and date_pattern.search(file.name)
+        ]
+        if not pdf_files:
+            print(style("No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)", fg="yellow"))
+            return
 
     # Process each PDF file
     for pdf_file in pdf_files:
@@ -223,9 +232,14 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
     default=DEFAULT_MODEL,
     help="Specify the LLM model to use for generating filenames.",
 )
-def main(scan_directory, test_mode, model):
+@click.option(
+    "--all-files",
+    is_flag=True,
+    help="Process all PDF files in the directory, regardless of filename pattern.",
+)
+def main(scan_directory, test_mode, model, all_files):
     """Process PDF files in the provided directory."""
-    process_pdfs(Path(scan_directory), test_mode, model)
+    process_pdfs(Path(scan_directory), test_mode, model, all_files)
 
 
 if __name__ == "__main__":

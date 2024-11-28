@@ -2,7 +2,7 @@
 
 A Python CLI tool that intelligently renames PDF files using LLaMA AI model integration. It extracts text from PDFs and generates meaningful filenames based on the content.
 
-[![Python Tests](https://github.com/yourusername/pdf-namer/actions/workflows/pytest.yml/badge.svg)](https://github.com/yourusername/pdf-namer/actions/workflows/pytest.yml)
+[![Python Tests](https://github.com/max-rousseaupdf-namer/actions/workflows/pytest.yml/badge.svg)](https://github.com/max-rousseaupdf-namer/actions/workflows/pytest.yml)
 
 ## Features
 
@@ -24,7 +24,7 @@ A Python CLI tool that intelligently renames PDF files using LLaMA AI model inte
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/pdf-namer.git
+git clone https://github.com/max-rousseaupdf-namer.git
 cd pdf-namer
 ```
 

@@ -9,28 +9,34 @@ import pypdf
 from click import style
 
 DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
-MODEL_CONTEXT_MAP = {"llama3.1:70b-instruct-q8_0": 128000}
+MODEL_CONTEXT_MAP = {
+    "llama3.1:70b-instruct-q8_0": 128000,
+    "llama3.2:3b-instruct-fp16": 128000,
+    "llama3.1:8b-instruct-fp16": 128000,
+}
+
 
 def calculate_context_window(model: str, prompt: str) -> int:
     """
     Calculate the minimum required context window size for the given prompt.
-    
+
     Args:
         model (str): The model name
         prompt (str): The prompt text
-        
+
     Returns:
         int: The required context window size
     """
     try:
-        encoding = tiktoken.encoding_for_model("gpt-4")  # Use gpt-4 encoding as default
-        token_count = len(encoding.encode(prompt))
-        
+        prompt_length = len(prompt)
+
         # Get max context size for model, default to 2048 if not found
         max_context = MODEL_CONTEXT_MAP.get(model, 2048)
-        
+
         # Return the minimum required size, capped at model's max
-        return min(token_count + 1000, max_context)  # Add 1000 tokens buffer for response
+        return min(
+            prompt_length + 1000, max_context
+        )  # Add 1000 tokens buffer for response
     except Exception as e:
         print(f"Error calculating context window: {str(e)}")
         return 2048  # Return default size on error
@@ -76,12 +82,13 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
 
     print(style("=" * 50, fg="blue"))
     print(style("Prompt Analysis", fg="green", bold=True))
-    
+
     # Calculate required context window
     context_window = calculate_context_window(model, prompt)
-    print(f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens)")
-    context_window = calculate_context_window(model, prompt)
-    
+    print(
+        f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens)"
+    )
+
     # Send the request to the Ollama service and measure time
     start_time = time.time()
     response = requests.post(
@@ -166,20 +173,23 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
         print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
-            if len(text) > 10000:
-                print(
-                    style(
-                        "Skipping: PDF content exceeds 10,000 characters", fg="yellow"
-                    )
-                )
-                print(f"Content length: {len(text)} characters")
-                continue
+            # if len(text) > 10000:
+            #     print(
+            #         style(
+            #             "Skipping: PDF content exceeds 10,000 characters", fg="yellow"
+            #         )
+            #     )
+            #     print(f"Content length: {len(text)} characters")
+            #     continue
             new_filename = generate_new_filename(text, pdf_file, model)
             if not new_filename:
                 print(f"Error processing {pdf_file.name}. Ignoring.")
+                continue
+
+            print(f"Original filename:\t{pdf_file.name}")
+            print(f"New filename:\t{new_filename}")
+
             if test_mode:
-                print(f"Original filename: {pdf_file.name}")
-                print(f"New filename: {new_filename}")
                 if click.confirm("Do you want to rename this file?", default=False):
                     pdf_file.rename(directory / new_filename)
                     print(style("File renamed successfully", fg="green"))
@@ -187,6 +197,7 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
                     print(style("Skipping file rename", fg="yellow"))
             else:
                 pdf_file.rename(directory / new_filename)
+
         except requests.exceptions.RequestException as e:
             print(f"Network error processing {pdf_file.name}: {e}")
         except Exception as e:

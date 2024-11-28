@@ -8,6 +8,7 @@ import pypdf
 from click import style
 
 DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
+MODEL_CONTEXT_MAP = {"llama3.1:70b-instruct-q8_0": 128000}
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
@@ -48,7 +49,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     prompt = prompt_path.read_text()
     prompt = prompt.format(text=text)
 
-    print(style("="*50, fg="blue"))
+    print(style("=" * 50, fg="blue"))
     print(style("Prompt Analysis", fg="green", bold=True))
     print(f"Sending prompt to Ollama (length: {len(prompt)} characters)")
 
@@ -60,7 +61,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0.5},
+            "options": {"temperature": 0.5, "num_ctx": window},
             "format": "json",
         },
         timeout=600,
@@ -68,7 +69,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     response.raise_for_status()
     elapsed_time = time.time() - start_time
     print(f"Received response from Ollama in {elapsed_time:.2f} seconds")
-    print(style("="*50, fg="blue"))
+    print(style("=" * 50, fg="blue"))
     try:
         data = response.json()
         if "response" not in data:
@@ -132,12 +133,16 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
 
     # Process each PDF file
     for pdf_file in pdf_files:
-        print(style("="*50, fg="blue"))
+        print(style("=" * 50, fg="blue"))
         print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
             if len(text) > 10000:
-                print(style("Skipping: PDF content exceeds 10,000 characters", fg="yellow"))
+                print(
+                    style(
+                        "Skipping: PDF content exceeds 10,000 characters", fg="yellow"
+                    )
+                )
                 print(f"Content length: {len(text)} characters")
                 continue
             new_filename = generate_new_filename(text, pdf_file, model)
@@ -146,7 +151,7 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
             if test_mode:
                 print(f"Original filename: {pdf_file.name}")
                 print(f"New filename: {new_filename}")
-                if click.confirm('Do you want to rename this file?', default=False):
+                if click.confirm("Do you want to rename this file?", default=False):
                     pdf_file.rename(directory / new_filename)
                     print(style("File renamed successfully", fg="green"))
                 else:

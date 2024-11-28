@@ -41,14 +41,11 @@ class TestGenerateNewFilename:
         original_file = Path("2023_10_12_13_14_15_sample.pdf")
         with patch('requests.post') as mock_post:
             mock_post.return_value.json.return_value = {
-                "model": "llama2",
-                "created_at": "2023-11-10T12:34:56Z",
-                "response": "Sample Name",
-                "done": True
+                "response": '{"date": "2023.10.12", "filename": "Sample Name"}'
             }
             mock_post.return_value.raise_for_status = MagicMock()
             new_filename = pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
-            assert new_filename == "2023.10.12 - Sample Name.pdf"
+            assert new_filename == "2023.10.12 - Sample Name"
 
     def test_network_error(self):
         sample_text = "Sample PDF content"
@@ -70,9 +67,11 @@ class TestGenerateNewFilename:
         sample_text = "Sample PDF content"
         original_file = Path("2023_10_12_13_14_15_sample.pdf")
         with patch('requests.post') as mock_post:
-            mock_post.return_value.json.return_value = {}  # Missing 'response' key
+            mock_post.return_value.json.return_value = {
+                "response": '{"invalid": "data"}'  # Missing required keys
+            }
             mock_post.return_value.raise_for_status = MagicMock()
-            result = pdf_renamer.generate_new_filename(sample_text, original_file)
+            result = pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
             assert result is None
 
     def test_filename_length_validation(self):
@@ -80,13 +79,31 @@ class TestGenerateNewFilename:
         original_file = Path("2023_10_12_13_14_15_sample.pdf")
         with patch('requests.post') as mock_post:
             mock_post.return_value.json.return_value = {
-                "response": "This is a very long filename that should be truncated"
+                "response": '{"date": "2023.10.12", "filename": "This is a very long filename that should be handled properly"}'
             }
             mock_post.return_value.raise_for_status = MagicMock()
-            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file)
-            assert len(new_filename) <= 32
-            assert new_filename.endswith('.pdf')
+            new_filename = pdf_renamer.generate_new_filename(sample_text, original_file, "llama2")
+            assert len(new_filename) <= 50  # Adjusted for new requirements
             assert ' - ' in new_filename
+
+class TestContextWindow:
+    def test_calculate_context_window(self):
+        model = "llama3.1:70b-instruct-q8_0"
+        prompt = "Short prompt"
+        result = pdf_renamer.calculate_context_window(model, prompt)
+        assert result == 1011  # prompt length + 1000 buffer
+
+    def test_calculate_context_window_long_prompt(self):
+        model = "llama3.1:70b-instruct-q8_0"
+        prompt = "x" * 130000  # Exceeds max context
+        result = pdf_renamer.calculate_context_window(model, prompt)
+        assert result == 128000  # Should cap at model's max context
+
+    def test_calculate_context_window_unknown_model(self):
+        model = "unknown_model"
+        prompt = "Test prompt"
+        result = pdf_renamer.calculate_context_window(model, prompt)
+        assert result == 2048  # Should return default size
 
 class TestProcessPdfs:
     def test_process_pdfs_test_mode_with_confirmation(self, tmp_path):

@@ -172,6 +172,10 @@ def process_pdfs(directory: Path, test_mode: bool, model: str):
         and date_pattern.search(file.name)
     ]
 
+    if not pdf_files:
+        print(style("No PDF files found matching the required date pattern format (YYYY_MM_DD_HH_MM_SS)", fg="yellow"))
+        return
+
     # Process each PDF file
     for pdf_file in pdf_files:
         print(style("=" * 50, fg="blue"))

@@ -206,8 +206,10 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
             print(f"Original filename:\t{pdf_file.name}")
             print(f"New filename:\t{new_filename}")
 
-            # Remove .pdf extension if it exists in new_filename
+            # Remove .pdf extension and trailing "..." if they exist
             new_filename = new_filename.replace('.pdf', '')
+            if new_filename.endswith('...'):
+                new_filename = new_filename[:-3].rstrip()
             
             if test_mode:
                 if click.confirm("Do you want to rename this file?", default=False):

@@ -1,5 +1,6 @@
 .aider*
 .env
-venv/
+.venv/
 __pycache__/
 launch.json
+.DS_Store

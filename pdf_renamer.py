@@ -13,6 +13,7 @@ MODEL_CONTEXT_MAP = {
     "llama3.1:70b-instruct-q8_0": 128000,
     "llama3.2:3b-instruct-fp16": 128000,
     "llama3.1:8b-instruct-fp16": 128000,
+    "gemma3:27b": 128000,
 }
 
 
@@ -144,14 +145,14 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
 
         # Clean and validate the summarized name
         date = data["date"].strip() if data["date"] else "YYYY.MM.DD"
-        filename = data['filename'].strip()
-        
+        filename = data["filename"].strip()
+
         # Truncate filename if too long (accounting for date and separator)
         max_length = 50
         date_and_sep_len = len(date) + 3  # date + " - "
         if len(filename) > max_length - date_and_sep_len:
-            filename = filename[:max_length - date_and_sep_len - 3] + "..."
-            
+            filename = filename[: max_length - date_and_sep_len - 3] + "..."
+
         summarized_name = f"{date} - {filename}"
         return summarized_name
     except Exception as e:
@@ -207,10 +208,10 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
             print(f"New filename:\t{new_filename}")
 
             # Remove .pdf extension and trailing "..." if they exist
-            new_filename = new_filename.replace('.pdf', '')
-            if new_filename.endswith('...'):
+            new_filename = new_filename.replace(".pdf", "")
+            if new_filename.endswith("..."):
                 new_filename = new_filename[:-3].rstrip()
-            
+
             if test_mode:
                 if click.confirm("Do you want to rename this file?", default=False):
                     pdf_file.rename(directory / f"{new_filename}.pdf")

@@ -22,6 +22,8 @@ Here are some examples to help you, respond only using JSON format, conforming t
 {{"filename": "Carmax Sale Amanda Macan.pdf", "date": "2024.04.26"}}
 {{"filename": "Some reference document.pdf", "date": null}}
 
+IMPORTANT: The total filename (including date and " - " separator) must not exceed 80 characters. Keep the filename portion concise.
+
 Now here is the file:
 
 ```pdf{text}```

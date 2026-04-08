@@ -1,5 +1,4 @@
 pypdf==3.17.1
-tiktoken==0.5.2
 requests==2.31.0
 pytest==7.4.3
 pytest-mock==3.12.0

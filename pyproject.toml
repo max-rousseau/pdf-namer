@@ -1,0 +1,106 @@
+# =============================================================================
+# BUILD SYSTEM
+# =============================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+only-include = ["pdf_renamer.py"]
+
+# =============================================================================
+# PROJECT METADATA
+# =============================================================================
+
+[project]
+name = "pdf-namer"
+version = "0.2.0"
+description = "CLI tool that renames PDF files using local LLM-generated descriptive filenames"
+readme = "README.md"
+license = {text = "BSD-2-Clause"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "pypdf~=3.17",
+    "requests~=2.31",
+    "click~=8.1",
+]
+requires-python = "~=3.11"
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest~=7.4",
+    "pytest-cov~=4.1",
+    "pytest-mock~=3.12",
+    "requests-mock~=1.11",
+    # Code quality
+    "black>=24.0",
+    "flake8>=7.0",
+    "flake8-pyproject>=1.2",
+    "bandit[toml]>=1.8",
+    "vulture>=2.14",
+]
+
+[project.scripts]
+pdf-namer = "pdf_renamer:main"
+
+# =============================================================================
+# CODE QUALITY TOOLS
+# =============================================================================
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "E501"]
+exclude = [".venv", ".git", "__pycache__", "build", "dist"]
+per-file-ignores = [
+    "__init__.py:F401",
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests"]
+skips = ["B101"]
+
+[tool.vulture]
+exclude = [".venv/"]
+min_confidence = 80
+
+# =============================================================================
+# TESTING
+# =============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = "test_*.py"
+python_functions = "test_*"
+python_classes = "Test*"
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+]
+
+[tool.coverage.run]
+source = ["."]
+branch = true
+omit = ["test_*.py", ".venv/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]

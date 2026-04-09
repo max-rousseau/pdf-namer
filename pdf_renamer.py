@@ -1,31 +1,86 @@
+"""
+Module: pdf_renamer
+
+Purpose:
+    CLI tool that renames PDF files using a locally running Ollama LLM instance.
+    Text is extracted from each PDF and sent to the model, which returns a
+    structured JSON response containing a descriptive filename and an inferred
+    document date. The file is then renamed to ``YYYY.MM.DD - Description.pdf``.
+
+Classes:
+    None
+
+Functions:
+    - calculate_context_window: Determine the num_ctx value to send to Ollama.
+    - extract_pdf_text: Read all text from a PDF file.
+    - generate_new_filename: Query the LLM and parse a (date, filename) tuple.
+    - format_filename: Assemble the final filename string from date and name parts.
+    - process_pdfs: Iterate over PDFs in a directory and rename them.
+
+Usage Example:
+    pdf-namer /path/to/directory
+    pdf-namer --test-mode --model gemma3:27b /path/to/directory
+    pdf-namer --all-files --backup-model gemma3:27b /path/to/directory
+
+Happy Path Flow:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI as pdf-namer (CLI)
+    participant Extractor as extract_pdf_text
+    participant LLM as Ollama (local)
+    participant FS as Filesystem
+
+    User->>CLI: pdf-namer /docs
+    CLI->>FS: list PDF files
+    FS-->>CLI: [2024_01_15_report.pdf, ...]
+    CLI->>Extractor: extract_pdf_text(pdf_path)
+    Extractor-->>CLI: raw text
+    CLI->>LLM: POST /api/generate (prompt + text)
+    LLM-->>CLI: {"date": "2024.01.15", "filename": "Verizon MyBill"}
+    CLI->>FS: rename to "2024.01.15 - Verizon MyBill.pdf"
+    FS-->>CLI: ok
+    CLI-->>User: "File renamed successfully"
+```
+"""
+
 import click
 import re
 import json
 import time
-import tiktoken
 from pathlib import Path
 import requests
 import pypdf
 from click import style
 
-DEFAULT_MODEL = "llama3.1:70b-instruct-q8_0"
+DEFAULT_MODEL = "gemma4:31b"
 MODEL_CONTEXT_MAP = {
     "llama3.1:70b-instruct-q8_0": 128000,
     "llama3.2:3b-instruct-fp16": 128000,
     "llama3.1:8b-instruct-fp16": 128000,
+    "gemma3:27b": 128000,
+    "gemma4:31b": 128000,
 }
 
 
 def calculate_context_window(model: str, prompt: str) -> int:
-    """
-    Calculate the minimum required context window size for the given prompt.
+    """Calculate the num_ctx value to request from Ollama for a given prompt.
+
+    Adds a fixed 1000-character buffer to the prompt length to leave room for
+    the model's JSON response, then caps the result at the model's maximum
+    supported context size. Falls back to 2048 for unrecognised models.
 
     Args:
-        model (str): The model name
-        prompt (str): The prompt text
+        model: Ollama model tag, e.g. ``"gemma4:31b"``.
+        prompt: The fully-formatted prompt string that will be sent to Ollama.
 
     Returns:
-        int: The required context window size
+        The context window size to pass as ``num_ctx`` in the Ollama request.
+
+    Example:
+        >>> calculate_context_window("gemma4:31b", "x" * 500)
+        1500
     """
     try:
         prompt_length = len(prompt)
@@ -43,14 +98,23 @@ def calculate_context_window(model: str, prompt: str) -> int:
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
-    """
-    Extracts text from a PDF file.
+    """Extract all text from a PDF file by concatenating every page.
 
     Args:
-        pdf_path (Path): Path to the PDF file.
+        pdf_path: Path to the PDF file to read.
 
     Returns:
-        str: Extracted text.
+        A single string containing the concatenated text of all pages.
+        Pages that yield no text contribute an empty string.
+
+    Raises:
+        pypdf.errors.PdfReadError: If the file is corrupted or not a valid PDF.
+        OSError: If the file cannot be opened.
+
+    Example:
+        >>> text = extract_pdf_text(Path("invoice.pdf"))
+        >>> print(text[:80])
+        'Invoice #1234 ...'
     """
     text = ""
     with pdf_path.open("rb") as file:
@@ -60,37 +124,57 @@ def extract_pdf_text(pdf_path: Path) -> str:
     return text
 
 
-def generate_new_filename(text: str, original_file: Path, model: str) -> str:
-    """
-    Generates a new filename based on PDF content and date extracted from the original filename.
+FAILED_DATE = "YYYY.MM.DD"
+FAILED_FILENAME = "Unknown Document"
+
+
+def generate_new_filename(text: str, original_file: Path, model: str) -> tuple:
+    """Query Ollama to produce a descriptive filename and date for a PDF.
+
+    Reads ``prompt.md`` from the current working directory, formats it with
+    the extracted PDF text, and sends the request to the local Ollama API at
+    ``http://127.0.0.1:11434``. The model is expected to return a JSON object
+    with exactly two keys: ``"date"`` and ``"filename"``.
+
+    When the model cannot determine a date, ``FAILED_DATE`` (``"YYYY.MM.DD"``)
+    is used as the date component. When the filename is absent or contains
+    ``"unknown"``, ``FAILED_FILENAME`` (``"Unknown Document"``) is substituted.
+    Filenames longer than 80 characters (including the date and separator) are
+    truncated with an ellipsis.
 
     Args:
-        text (str): The content of the PDF file.
-        original_file (Path): The original PDF file.
-        model (str): The LLM model to use for generating filenames.
+        text: Full text extracted from the PDF, used as the prompt body.
+        original_file: Path to the original PDF file (used for logging only).
+        model: Ollama model tag to use, e.g. ``"gemma4:31b"``.
 
     Returns:
-        str: The new filename.
+        A ``(date, filename)`` tuple on success, or ``None`` if the API
+        response is missing, malformed, or cannot be parsed.
+
+    Raises:
+        requests.exceptions.RequestException: On network or HTTP errors when
+            contacting the Ollama API.
+        FileNotFoundError: If ``prompt.md`` does not exist in the working
+            directory.
+
+    Example:
+        >>> result = generate_new_filename(text, Path("scan.pdf"), "gemma4:31b")
+        >>> result
+        ('2024.03.15', 'Verizon MyBill')
     """
-
-    max_summarized_length = 17
-
     # Read the prompt from 'prompt.md'
     prompt_path = Path("prompt.md")
     prompt = prompt_path.read_text()
     prompt = prompt.format(text=text)
 
     print(style("=" * 50, fg="blue"))
-    print(style("Prompt Analysis", fg="green", bold=True))
+    print(style(f"Prompt Analysis ({model})", fg="green", bold=True))
 
     # Calculate required context window
     context_window = calculate_context_window(model, prompt)
-    # Calculate tokens for performance tracking
-    encoding = tiktoken.encoding_for_model("gpt-4")
-    token_count = len(encoding.encode(prompt))
 
     print(
-        f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window} tokens, input tokens: {token_count})"
+        f"Sending prompt to Ollama (length: {len(prompt)} characters, context window: {context_window})"
     )
 
     # Send the request to the Ollama service and measure time
@@ -108,10 +192,7 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
     )
     response.raise_for_status()
     elapsed_time = time.time() - start_time
-    tokens_per_second = token_count / elapsed_time
-    print(
-        f"Received response from Ollama in {elapsed_time:.2f} seconds ({tokens_per_second:.1f} tokens/second)"
-    )
+    print(f"Received response from Ollama in {elapsed_time:.2f} seconds")
     print(style("=" * 50, fg="blue"))
     try:
         data = response.json()
@@ -143,30 +224,82 @@ def generate_new_filename(text: str, original_file: Path, model: str) -> str:
             return None
 
         # Clean and validate the summarized name
-        date = data["date"].strip() if data["date"] else "YYYY.MM.DD"
-        filename = data['filename'].strip()
-        
+        date = data["date"].strip() if data["date"] else FAILED_DATE
+        filename = data["filename"].strip()
+        if not filename or "unknown" in filename.lower():
+            filename = FAILED_FILENAME
+
         # Truncate filename if too long (accounting for date and separator)
-        max_length = 50
+        max_length = 80
         date_and_sep_len = len(date) + 3  # date + " - "
         if len(filename) > max_length - date_and_sep_len:
-            filename = filename[:max_length - date_and_sep_len - 3] + "..."
-            
-        summarized_name = f"{date} - {filename}"
-        return summarized_name
+            filename = filename[: max_length - date_and_sep_len - 3] + "..."
+
+        return (date, filename)
     except Exception as e:
         print(f"Error generating filename: {str(e)}")
         return None
 
 
-def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool = False):
-    """
-    Processes PDF files in the given directory.
+def format_filename(date: str, filename: str) -> str:
+    """Assemble the final filename string from a date and a name part.
+
+    Joins ``date`` and ``filename`` with `` - ``, strips any trailing ``.pdf``
+    suffix that may have been included in the LLM response, and removes a
+    trailing ellipsis (``...``) left by truncation logic in
+    ``generate_new_filename``.
 
     Args:
-        directory (Path): The directory containing PDF files.
-        test_mode (bool): Whether to run in test mode without renaming
-        model (str): The LLM model to use for generating filenames
+        date: Document date string in ``YYYY.MM.DD`` format, or the sentinel
+            ``"YYYY.MM.DD"`` when the date could not be determined.
+        filename: Descriptive name part, without extension.
+
+    Returns:
+        A filename string without extension, ready to have ``.pdf`` appended
+        before writing to disk.
+
+    Example:
+        >>> format_filename("2024.03.15", "Verizon MyBill")
+        '2024.03.15 - Verizon MyBill'
+    """
+    name = f"{date} - {filename}"
+    name = name.replace(".pdf", "")
+    if name.endswith("..."):
+        name = name[:-3].rstrip()
+    return name
+
+
+def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool = False, backup_model: str = None):
+    """Process and rename PDF files in a directory using LLM-generated names.
+
+    By default, only files whose names contain a timestamp in the format
+    ``YYYY_MM_DD_HH_MM_SS`` are processed. Pass ``all_files=True`` to process
+    every PDF in the directory.
+
+    For each file, ``extract_pdf_text`` and ``generate_new_filename`` are
+    called. If either the date or the filename component of the primary model's
+    response is a failure sentinel and ``backup_model`` is provided, the backup
+    model is queried and its successful fields are merged into the result.
+
+    In test mode the user is prompted to confirm each rename interactively.
+    In normal mode files are renamed immediately.
+
+    Args:
+        directory: Directory to scan for PDF files.
+        test_mode: When ``True``, prompt the user before each rename instead
+            of renaming automatically.
+        model: Primary Ollama model tag, e.g. ``"gemma4:31b"``.
+        all_files: When ``True``, process every PDF regardless of filename
+            pattern. When ``False`` (default), skip files that do not match
+            the ``YYYY_MM_DD_HH_MM_SS`` timestamp pattern.
+        backup_model: Optional Ollama model tag used as a fallback when the
+            primary model returns a failure sentinel for ``date`` or
+            ``filename``. Only the failed fields are replaced; successful
+            fields from the primary model are preserved.
+
+    Raises:
+        requests.exceptions.RequestException: Propagated per-file on network
+            failure; the file is skipped and processing continues.
     """
     # Get all PDF files first
     pdf_files = [
@@ -198,17 +331,31 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
         print(style(f"Processing {pdf_file.name}", fg="green", bold=True))
         try:
             text = extract_pdf_text(pdf_file)
-            new_filename = generate_new_filename(text, pdf_file, model)
-            if not new_filename:
+            result = generate_new_filename(text, pdf_file, model)
+            if not result:
                 print(f"Error processing {pdf_file.name}. Ignoring.")
                 continue
+
+            date, filename = result
+            has_bad_date = date == FAILED_DATE
+            has_bad_filename = filename == FAILED_FILENAME
+
+            # Retry with backup model if there's any failure
+            if backup_model and (has_bad_date or has_bad_filename):
+                print(style(f"Partial/total failure detected, retrying with backup model: {backup_model}", fg="yellow"))
+                backup_result = generate_new_filename(text, pdf_file, backup_model)
+                if backup_result:
+                    backup_date, backup_filename = backup_result
+                    if has_bad_date and backup_date != FAILED_DATE:
+                        date = backup_date
+                    if has_bad_filename and backup_filename != FAILED_FILENAME:
+                        filename = backup_filename
+
+            new_filename = format_filename(date, filename)
 
             print(f"Original filename:\t{pdf_file.name}")
             print(f"New filename:\t{new_filename}")
 
-            # Remove .pdf extension if it exists in new_filename
-            new_filename = new_filename.replace('.pdf', '')
-            
             if test_mode:
                 if click.confirm("Do you want to rename this file?", default=False):
                     pdf_file.rename(directory / f"{new_filename}.pdf")
@@ -216,7 +363,6 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
                 else:
                     print(style("Skipping file rename in test mode", fg="yellow"))
             else:
-                # In non-test mode, rename without confirmation
                 pdf_file.rename(directory / f"{new_filename}.pdf")
                 print(style("File renamed successfully", fg="green"))
 
@@ -241,9 +387,14 @@ def process_pdfs(directory: Path, test_mode: bool, model: str, all_files: bool =
     is_flag=True,
     help="Process all PDF files in the directory, regardless of filename pattern.",
 )
-def main(scan_directory, test_mode, model, all_files):
+@click.option(
+    "--backup-model",
+    default=None,
+    help="Backup model to retry when the primary model fails to extract date or filename.",
+)
+def main(scan_directory, test_mode, model, all_files, backup_model):
     """Process PDF files in the provided directory."""
-    process_pdfs(Path(scan_directory), test_mode, model, all_files)
+    process_pdfs(Path(scan_directory), test_mode, model, all_files, backup_model)
 
 
 if __name__ == "__main__":
